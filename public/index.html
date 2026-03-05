@@ -1,0 +1,86 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meldrino ZBD Connect</title>
+  <style>
+    body {
+      background: #1a1a2e;
+      color: white;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 24px;
+      box-sizing: border-box;
+      text-align: center;
+    }
+    h1 { color: #64ffda; margin-bottom: 8px; }
+    p { color: rgba(255,255,255,0.6); margin-bottom: 24px; }
+    img { border: 2px solid #64ffda; border-radius: 12px; margin: 16px 0; }
+    #status { font-size: 14px; color: rgba(255,255,255,0.5); margin-top: 16px; }
+    .step { 
+      background: #16213e; 
+      border-radius: 12px; 
+      padding: 16px 24px; 
+      margin: 8px 0;
+      max-width: 400px;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <h1>Meldrino ZBD Connect</h1>
+  <div id="app">
+    <p>Starting secure connection...</p>
+  </div>
+
+  <script>
+    const app = document.getElementById('app');
+    let sessionId = null;
+    let pollInterval = null;
+
+    async function start() {
+      const res = await fetch('/start');
+      const data = await res.json();
+      sessionId = data.sessionId;
+      app.innerHTML = '<p>Connecting to ZBD...</p>';
+      pollInterval = setInterval(poll, 1000);
+    }
+
+    async function poll() {
+      if (!sessionId) return;
+      const res = await fetch('/status/' + sessionId);
+      const data = await res.json();
+
+      if (data.status === 'qr_ready' && !document.getElementById('zbdqr')) {
+        app.innerHTML = `
+          <div class="step">Step 1 — Scan this QR with your ZBD app</div>
+          <img id="zbdqr" src="${data.qr}" width="250" height="250" />
+          <div id="status">Waiting for ZBD authentication...</div>
+        `;
+      }
+
+      if (data.status === 'authenticated') {
+        clearInterval(pollInterval);
+        app.innerHTML = `
+          <div class="step">Authenticated! Step 2 — Scan this QR with Meldrino</div>
+          <img src="${data.tokenQr}" width="250" height="250" />
+          <div id="status">Scan the QR above using the Meldrino app to complete setup.</div>
+        `;
+      }
+
+      if (data.status === 'closed' || data.status === 'not_found') {
+        clearInterval(pollInterval);
+        app.innerHTML = '<p>Session expired. <a href="/" style="color:#64ffda">Try again</a></p>';
+      }
+    }
+
+    start();
+  </script>
+</body>
+</html>
